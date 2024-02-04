@@ -27,8 +27,8 @@ var (
 	defaultHttpsPort = ":443"
 	DefaultHttpPort  = ":80"
 	dir              = flag.String("d", ".", "The directory to serve files from. (Default: current dir)")
-	secure           = flag.Bool("s", false, "Use Https.")
-	port             = flag.String("p", "", "Listening port. (Default 80 or 443 if using Https")
+	secure           = flag.Bool("s", false, "Use HTTPS.")
+	port             = flag.String("p", "", "Listening port. (Default 80 or 443 if using HTTPS")
 )
 
 // Not a graceful Server Shutdown, may improve later.
@@ -38,7 +38,7 @@ func shutdown() {
 	go func() {
 		<-c
 		fmt.Println("\r[!] Shutting down server...")
-		fmt.Printf("\nLVX SIT - ALPHARIVS - MMXXI")
+		fmt.Printf("\nLVX SIT - ALPHARIVS - MMDCCLXXVII")
 		os.Exit(1)
 	}()
 }
@@ -113,7 +113,7 @@ func HttpsServer(port string, handler http.Handler) error {
 		TLSConfig: tlsConfig,
 	}
 
-	fmt.Printf("[!] Started Https server on port %s\n", port)
+	fmt.Printf("[!] Started HTTPS server on port %s\n", port)
 	return server.ListenAndServeTLS("", "")
 }
 
@@ -136,10 +136,10 @@ func main() {
 		}
 	case !*secure:
 		if *port == "" {
-			fmt.Printf("[!] Started Http server on port 80\n")
+			fmt.Printf("[!] Started HTTP server on port 80\n")
 			err = http.ListenAndServe(DefaultHttpPort, l)
 		} else {
-			fmt.Printf("[!] Started Http server on port %s\n", *port)
+			fmt.Printf("[!] Started HTTP server on port %s\n", *port)
 			err = http.ListenAndServe(":"+*port, l)
 		}
 	}
