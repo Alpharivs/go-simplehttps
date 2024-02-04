@@ -20,14 +20,17 @@ import (
 
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
-	"github.com/pkg/errors"
 )
+
 // Arguments
 var (
-	dir    = flag.String("d", ".", "The directory to serve files from. (Default: current dir)")
-	secure = flag.Bool("s", false, "Use TLS.")
-	port   = flag.String("p", "", "Listening port. (Default 80 or 443 is using TLS")
+	defaultHttpsPort = ":443"
+	DefaultHttpPort  = ":80"
+	dir              = flag.String("d", ".", "The directory to serve files from. (Default: current dir)")
+	secure           = flag.Bool("s", false, "Use Https.")
+	port             = flag.String("p", "", "Listening port. (Default 80 or 443 if using Https")
 )
+
 // Not a graceful Server Shutdown, may improve later.
 func shutdown() {
 	c := make(chan os.Signal, 1)
@@ -39,12 +42,13 @@ func shutdown() {
 		os.Exit(1)
 	}()
 }
+
 // Generate the .crt and .key file
 func GenKeyAndCert() ([]byte, []byte, error) {
 	bits := 4096
 	privateKey, err := rsa.GenerateKey(rand.Reader, bits)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "rsa.GenerateKey")
+		return nil, nil, fmt.Errorf("error in rsa.GenerateKey(): %w", err)
 	}
 
 	template := x509.Certificate{
@@ -59,7 +63,7 @@ func GenKeyAndCert() ([]byte, []byte, error) {
 
 	derCert, err := x509.CreateCertificate(rand.Reader, &template, &template, &privateKey.PublicKey, privateKey)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "x509.CreateCertificate")
+		return nil, nil, fmt.Errorf("error in x509.CreateCertificate(): %w", err)
 	}
 
 	buf := &bytes.Buffer{}
@@ -68,7 +72,7 @@ func GenKeyAndCert() ([]byte, []byte, error) {
 		Bytes: derCert,
 	})
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "pem.Encode")
+		return nil, nil, fmt.Errorf("error in cert pem.Encode(): %w", err)
 	}
 
 	pemCert := buf.Bytes()
@@ -79,7 +83,7 @@ func GenKeyAndCert() ([]byte, []byte, error) {
 		Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
 	})
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "pem.Encode")
+		return nil, nil, fmt.Errorf("error in key pem.Encode(): %w", err)
 	}
 
 	pemKey := buf.Bytes()
@@ -91,12 +95,12 @@ func GenKeyAndCert() ([]byte, []byte, error) {
 func HttpsServer(port string, handler http.Handler) error {
 	rawCert, rawKey, err := GenKeyAndCert()
 	if err != nil {
-		return errors.Wrap(err, "GenKeyAndCert")
+		return fmt.Errorf("error in GenKeyAndCert(): %w", err)
 	}
 
 	cert, err := tls.X509KeyPair(rawCert, rawKey)
 	if err != nil {
-		return errors.Wrap(err, "x509KeyPair")
+		return fmt.Errorf("error in x509KeyPair(): %w", err)
 	}
 
 	tlsConfig := &tls.Config{
@@ -104,7 +108,7 @@ func HttpsServer(port string, handler http.Handler) error {
 	}
 
 	server := http.Server{
-		Addr:      ":" + port,
+		Addr:      port,
 		Handler:   handler,
 		TLSConfig: tlsConfig,
 	}
@@ -126,14 +130,14 @@ func main() {
 	switch {
 	case *secure:
 		if *port == "" {
-			err = HttpsServer("443", l)
+			err = HttpsServer(defaultHttpsPort, l)
 		} else {
-			err = HttpsServer(*port, l)
+			err = HttpsServer(":"+*port, l)
 		}
 	case !*secure:
 		if *port == "" {
 			fmt.Printf("[!] Started Http server on port 80\n")
-			err = http.ListenAndServe(":80", l)
+			err = http.ListenAndServe(DefaultHttpPort, l)
 		} else {
 			fmt.Printf("[!] Started Http server on port %s\n", *port)
 			err = http.ListenAndServe(":"+*port, l)
