@@ -59,7 +59,7 @@ HTTPS mode:
 ```
 HTTP mode:
 ```bash
-# Start server with
+# Start server
 ❯ goserver
 [!] Started HTTP server on port 80
 
