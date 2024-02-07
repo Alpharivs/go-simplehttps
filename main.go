@@ -142,6 +142,18 @@ func HttpServer(port string, handler http.Handler) error {
 	return server.ListenAndServe()
 }
 
+func StartServer(secure bool, port string, handler http.Handler) error {
+	// Start HTTPS or HTTP server according to user flag
+	var err error
+	switch {
+	case secure:
+		err = HttpsServer(port, handler)
+	default:
+		err = HttpServer(port, handler)
+	}
+	return err
+}
+
 func main() {
 	flag.Parse()
 	// Configure routing and middleware.
@@ -149,16 +161,7 @@ func main() {
 	r.PathPrefix("/").Handler(http.FileServer(http.Dir(*dir)))
 	l := handlers.LoggingHandler(os.Stdout, r)
 
-	var err error
-	// Start HTTPS or HTTP server according to user flag
-	switch {
-	case *secure:
-		err = HttpsServer(*port, l)
-	case !*secure:
-		err = HttpServer(*port, l)
-	}
-
-	if err != nil {
+	if err := StartServer(*secure, *port, l); err != nil {
 		log.Fatal(err)
 	}
 }
