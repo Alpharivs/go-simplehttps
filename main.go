@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
@@ -24,22 +25,25 @@ import (
 
 // Arguments
 var (
-	defaultHttpsPort = ":443"
-	DefaultHttpPort  = ":80"
-	dir              = flag.String("d", ".", "The directory to serve files from. (Default: current dir)")
-	secure           = flag.Bool("s", false, "Use HTTPS.")
-	port             = flag.String("p", "", "Listening port. (Default 80 or 443 if using HTTPS")
+	dir    = flag.String("d", ".", "The directory to serve files from. (Default: current dir)")
+	secure = flag.Bool("s", false, "Use TLS.")
+	port   = flag.String("p", "", "Listening port. (Default 80 or 443 is using TLS")
 )
 
-// Not a graceful Server Shutdown, may improve later.
-func shutdown() {
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+// Graceful Server Shutdown.
+func shutdown(server *http.Server) {
 	go func() {
+		c := make(chan os.Signal, 1)
+		signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 		<-c
-		fmt.Println("\r[!] Shutting down server...")
-		fmt.Printf("\nLVX SIT - ALPHARIVS - MMDCCLXXVII")
-		os.Exit(1)
+		// create context for server shutdown
+		shutdownCtx, shutdownRelease := context.WithTimeout(context.Background(), 10*time.Second)
+		defer shutdownRelease()
+		// clear terminal and print banner
+		fmt.Print("\r\033[K")
+		fmt.Println("\r\nLVX SIT - ALPHARIVS - MMXXI")
+		// graceful shutdown
+		server.Shutdown(shutdownCtx)
 	}()
 }
 
@@ -91,7 +95,7 @@ func GenKeyAndCert() ([]byte, []byte, error) {
 	return pemCert, pemKey, nil
 }
 
-// Configure and run Https server.
+// Configure and run HTTPS server.
 func HttpsServer(port string, handler http.Handler) error {
 	rawCert, rawKey, err := GenKeyAndCert()
 	if err != nil {
@@ -107,42 +111,53 @@ func HttpsServer(port string, handler http.Handler) error {
 		Certificates: []tls.Certificate{cert},
 	}
 
+	if port == "" {
+		port = "443"
+	}
+
 	server := http.Server{
-		Addr:      port,
+		Addr:      ":" + port,
 		Handler:   handler,
 		TLSConfig: tlsConfig,
 	}
+	shutdown(&server)
 
-	fmt.Printf("[!] Started HTTPS server on port %s\n", port)
+	fmt.Printf("[!] Started Https server on port %s\n", port)
 	return server.ListenAndServeTLS("", "")
+}
+
+// Configure and run HTTP server.
+func HttpServer(port string, handler http.Handler) error {
+	if port == "" {
+		port = "80"
+	}
+
+	server := http.Server{
+		Addr:    ":" + port,
+		Handler: handler,
+	}
+	shutdown(&server)
+
+	fmt.Printf("[!] Started Http server on port %s\n", port)
+	return server.ListenAndServe()
 }
 
 func main() {
 	flag.Parse()
-	shutdown()
-
+	// Configure routing and middleware.
 	r := mux.NewRouter()
 	r.PathPrefix("/").Handler(http.FileServer(http.Dir(*dir)))
 	l := handlers.LoggingHandler(os.Stdout, r)
 
 	var err error
-
+	// Start HTTPS or HTTP server according to user flag
 	switch {
 	case *secure:
-		if *port == "" {
-			err = HttpsServer(defaultHttpsPort, l)
-		} else {
-			err = HttpsServer(":"+*port, l)
-		}
+		err = HttpsServer(*port, l)
 	case !*secure:
-		if *port == "" {
-			fmt.Printf("[!] Started HTTP server on port 80\n")
-			err = http.ListenAndServe(DefaultHttpPort, l)
-		} else {
-			fmt.Printf("[!] Started HTTP server on port %s\n", *port)
-			err = http.ListenAndServe(":"+*port, l)
-		}
+		err = HttpServer(*port, l)
 	}
+
 	if err != nil {
 		log.Fatal(err)
 	}
