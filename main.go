@@ -32,9 +32,10 @@ var (
 
 // Graceful Server Shutdown.
 func shutdown(server *http.Server) {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+
 	go func() {
-		c := make(chan os.Signal, 1)
-		signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 		<-c
 		// create context for server shutdown
 		shutdownCtx, shutdownRelease := context.WithTimeout(context.Background(), 10*time.Second)
