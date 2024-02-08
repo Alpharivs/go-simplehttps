@@ -1,4 +1,4 @@
-module server
+module github.com/Alpharivs/go-simplehttps
 
 go 1.21.6
 
