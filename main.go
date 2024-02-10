@@ -19,8 +19,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gorilla/handlers"
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 )
 
 // Arguments
@@ -155,14 +155,22 @@ func StartServer(secure bool, port string, handler http.Handler) error {
 	return err
 }
 
+// wrapping http.Filserver because r.GET requires a http.HandlerFunc
+func fileServerHandler(root string) http.HandlerFunc {
+	fs := http.FileServer(http.Dir(root))
+	return func(w http.ResponseWriter, r *http.Request) {
+		fs.ServeHTTP(w, r)
+	}
+}
+
 func main() {
 	flag.Parse()
 	// Configure routing and middleware.
-	r := mux.NewRouter()
-	r.PathPrefix("/").Handler(http.FileServer(http.Dir(*dir)))
-	l := handlers.LoggingHandler(os.Stdout, r)
+	r := chi.NewRouter()
+	r.Use(middleware.Logger)
+	r.Get("/", fileServerHandler(*dir))
 
-	if err := StartServer(*secure, *port, l); err != nil {
+	if err := StartServer(*secure, *port, r); err != nil {
 		log.Fatal(err)
 	}
 }
