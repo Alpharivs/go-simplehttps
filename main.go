@@ -168,7 +168,7 @@ func main() {
 	// Configure routing and middleware.
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
-	r.Get("/", fileServerHandler(*dir))
+	r.Get("/*", fileServerHandler(*dir))
 
 	if err := StartServer(*secure, *port, r); err != nil {
 		log.Fatal(err)
